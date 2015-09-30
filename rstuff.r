@@ -69,7 +69,7 @@ getStockDirection<-function(symbol, direction='direction'){
 	if (	abs((sym[,4][[1]] - sym[,1][[1]])/(sym[,2][[1]] - sym[,3][[1]])) < 0.4 && abs((sym[,3][[1]] - sym[,4][[1]])/(sym[,2][[1]] - sym[,1][[1]])) < 0.4	) {
 		bearish<-TRUE
 	}
-	else if (	abs((sym[,4][[1]] - sym[,1][[1]])/(sym[,2][[1]] - sym[,3][[1]])) < 0.4 && abs((sym[,2][[1]] - sym[,4][[1]])/(sym[,1][[1]] - sym[,3][[1]])) < 0.4	) {
+	if (	abs((sym[,4][[1]] - sym[,1][[1]])/(sym[,2][[1]] - sym[,3][[1]])) < 0.4 && abs((sym[,2][[1]] - sym[,4][[1]])/(sym[,1][[1]] - sym[,3][[1]])) < 0.4	) {
 		bullish<-TRUE
 	}
 	if (bullish && direction=='bullish') TRUE else if (bearish && direction=='bearish') TRUE 
@@ -155,6 +155,7 @@ getPriceLevels<-function(symbol){
 getNextResistance<-function(levels_vector, current_price){
 	all_prices<-c(levels_vector,current_price)					#'mix' the current_price within the prices vector	
 	all_prices_sorted=sort(unlist(all_prices), decreasing=FALSE)	# order the prices
+	all_prices_sorted=append(all_prices_sorted, 10000.0, after=all_prices_sorted[length(all_prices_sorted)]) #create theoretical highest possible resistance
 	current_price_posn<-match(c(current_price),all_prices_sorted)	# position of the current_price
 	next_resistance<-all_prices_sorted[as.numeric(current_price_posn)+1]  # next resistance price to hit 
 	return(next_resistance)
@@ -162,8 +163,9 @@ getNextResistance<-function(levels_vector, current_price){
 
 
 getNextSupport<-function(levels_vector, current_price){
-	all_prices<-c(levels_vector,current_price)					#'mix' the current_price within the prices vector	
+	all_prices<-c(levels_vector,current_price)					#'mix' the current_price within the prices vector
 	all_prices_sorted=sort(unlist(all_prices), decreasing=FALSE)	# order the prices
+	all_prices_sorted=append(all_prices_sorted, 0.0, after=0)		#create theoretical lowest possible support
 	current_price_posn<-match(c(current_price),all_prices_sorted)	# position of the current_price
 	next_support<-all_prices_sorted[as.numeric(current_price_posn)-1]  # next support price to hit 
 	return(next_support)
@@ -177,7 +179,7 @@ getNextSupport<-function(levels_vector, current_price){
 
 get_good_contracts<-function() {	
 	for (symbol in symbols) {
-		bullish<-getStockDirection(symbol, direction='bullish')				#check if stock is bullish
+		bullish<-getStockDirection(symbol, direction='bullish')			#check if stock is bullish
 		bearish<-getStockDirection(symbol, direction='bearish')			#check if stock is bearish
 
 		levels<-getPriceLevels(symbol)	
@@ -188,10 +190,10 @@ get_good_contracts<-function() {
 		
 			#get the strikes of the selected contracts (using indexing)
 			strike<-lowVol_contracts[,2][match(c(contract),lowVol_contracts[,1])]
-					
+
 			#establish the current(last) stock-price; current price is needed to know its location relative to the next level (above or below)
 			current_price<-tail(get(symbol), n=1)[,6][[1]]
-			
+
 			#When looking for the next level that is to be hit, for bullish stocks, only handle contracts whose strikes that are above the current price (the strikes u want to hit)
 			#for bearish stocks, only handle contracts whose strikes that are below the current price (the strikes u want to hit)
 			next_level=if (!is.null(bullish) && as.numeric(strike) > current_price) getNextResistance(levels,current_price) else if( !is.null(bearish) && as.numeric(strike) < current_price) getNextSupport(levels,current_price)	
@@ -199,13 +201,14 @@ get_good_contracts<-function() {
 			#if the next level is above the current price, then it is a resistance; the converse is true
 			#we null-check because contracts that dont meet the above condition return NULL
 			if (!is.null(next_level)){
-			if (next_level > current_price  &&   as.numeric(strike) < next_level) {				
-				print(contract)
-			}			
-			else if (next_level < current_price  && as.numeric(strike) > next_level) {
-				print(contract)
-			}
+				if (next_level > current_price  &&   as.numeric(strike) < next_level) {				
+					print(contract)
+				}			
+				else if (next_level < current_price  && as.numeric(strike) > next_level) {
+					print(contract)
+				}
 			}
 		}
 	}
 }
+
